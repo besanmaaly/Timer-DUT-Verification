@@ -1,0 +1,128 @@
+// ============================================================================
+// timer.v  -- DUT (intentionally buggy, unmodified logic)
+//
+// ONLY ADDITION vs. the original file: the rst_n port and reset behavior
+// (spec note #8: "we must add the reset signal, positive or negative edge
+// doesn't matter"). No functional bug in the original logic has been fixed.
+// ============================================================================
+
+module timer(d,a,clk,g0,g1,rst_n,out0,out1);
+
+    inout  [3:0] d;
+    input  [1:0] a;
+    input        clk, g0, g1;
+    input        rst_n;            // ADDED: async active-low reset
+    output reg   out0, out1;
+
+
+    reg [7:0] counter0, counter1;
+    reg [2:0] mode0, mode1;
+    reg       ptr0, ptr1;
+
+    reg [7:0] cnt0, cnt1;
+
+
+    assign d = 4'bz;
+
+
+    initial begin
+        counter0 = 8'd0; counter1 = 8'd0;
+        mode0    = 3'd0; mode1    = 3'd0;
+        ptr0     = 1'b0; ptr1     = 1'b0;
+        cnt0     = 8'd0; cnt1     = 8'd0;
+    end
+
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            counter0 <= 8'd0;
+            mode0    <= 3'd0;
+            ptr0     <= 1'b0;
+            counter1 <= 8'd0;
+            mode1    <= 3'd0;
+            ptr1     <= 1'b0;
+        end else begin
+        case (a)
+            2'b00: begin
+                if (!ptr0) begin
+                    counter0[3:0] <= d;
+                    ptr0          <= 1'b1;
+                end else begin
+                    counter0[7:4] <= d;
+                    ptr0          <= 1'b0;
+                end
+            end
+
+            2'b01: begin
+                if (!ptr1) begin
+                    counter1[3:0] <= d;
+                    ptr1          <= 1'b1;
+                end else begin
+                    counter1[7:4] <= d;
+                    ptr1          <= 1'b0;
+                end
+            end
+
+            2'b10: begin
+                if (d[3] == 1'b0)
+                    mode0 <= d[2:0];
+                else
+                    mode1 <= d[2:0];
+            end
+
+            default: ;
+        endcase
+        end
+    end
+
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            cnt0 <= 8'd0;
+        end else if (g0) begin
+            if ((counter0 <= 8'd1) || (cnt0 >= counter0 - 8'd1))
+                cnt0 <= 8'd0;
+            else
+                cnt0 <= cnt0 + 8'd1;
+        end
+
+    end
+
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            cnt1 <= 8'd0;
+        end else if (g1) begin
+            if ((counter1 <= 8'd1) || (cnt1 >= counter1 - 8'd1))
+                cnt1 <= 8'd0;
+            else
+                cnt1 <= cnt1 + 8'd1;
+        end
+
+    end
+
+
+    always @(*) begin
+        case (mode0)
+            3'd0: out0 = (cnt0 < (counter0 - 8'd2))        ? 1'b1 : 1'b0;
+            3'd1: out0 = (cnt0 < 8'd1)                      ? 1'b1 : 1'b0;
+            3'd2: out0 = (cnt0 < (counter0 / 8'd3))         ? 1'b0 : 1'b1;
+            3'd3: out0 = (cnt0 < (counter0 / 8'd2))         ? 1'b0 : 1'b1;
+            3'd4: out0 = (cnt0 < ((counter0 - 8'd3) / 8'd2))? 1'b0 : 1'b1;
+            default: out0 = 1'b0;
+        endcase
+    end
+
+
+    always @(*) begin
+        case (mode1)
+            3'd0: out1 = (cnt1 < (counter1 - 8'd2))         ? 1'b1 : 1'b0;
+            3'd1: out1 = (cnt1 < 8'd1)                      ? 1'b1 : 1'b0;
+            3'd2: out1 = (cnt1 < (counter1 / 8'd3))         ? 1'b0 : 1'b1;
+            3'd3: out1 = (cnt1 < (counter1 / 8'd2))         ? 1'b0 : 1'b1;
+            3'd4: out1 = (cnt1 < ((counter1 - 8'd3) / 8'd2))? 1'b0 : 1'b1;
+            default: out1 = 1'b0;
+        endcase
+    end
+
+endmodule
